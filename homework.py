@@ -6,18 +6,8 @@ from http import HTTPStatus
 import requests
 from telebot import TeleBot
 from dotenv import load_dotenv
-
-
-class HomeworkStatusError(Exception):
-    """Исключение при недокументированном статусе домашней работы."""
-
-    pass
-
-
-class TelegramMessageSendError(Exception):
-    """Исключение при ошибке отправки сообщения в Telegram."""
-
-    pass
+from telegram.error import TelegramError
+import json
 
 
 load_dotenv()
@@ -52,8 +42,11 @@ def send_message(bot, message: str) -> None:
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug(f'Успешно отправлено сообщение: {message}')
+    except TelegramError as error:
+        logging.error(f'Ошибка Телеграм при отправке сообщения: {error}')
+        raise RuntimeError(f'Не удалось отправить сообщение: {error}')
     except Exception as error:
-        logging.error(f'Ошибка при отправке сообщения: {error}')
+        logging.error(f'Неожиданная ошибка при отправке сообщения: {error}')
         raise RuntimeError(f'Не удалось отправить сообщение: {error}')
 
 
@@ -63,11 +56,14 @@ def get_api_answer(timestamp):
         response = requests.get(
             ENDPOINT, headers=HEADERS, params={'from_date': timestamp}
         )
-        if response.status_code != HTTPStatus.OK:
-            raise Exception(f"Код ответа API: {response.status_code}")
-        return response.json()
     except Exception as error:
         raise Exception(f"Сбой при запросе к эндпоинту API: {error}")
+    if response.status_code != HTTPStatus.OK:
+        raise requests.HTTPError(f"API вернул код {response.status_code}")
+    try:
+        return response.json()
+    except json.JSONDecodeError as e:
+        raise ValueError(f"API вернул некорректный JSON: {e}")
 
 
 def check_response(response: dict) -> list:
@@ -93,7 +89,7 @@ def parse_status(homework: dict) -> str:
         raise KeyError(f'Пустое значение по ключу {homework_name}')
     if homework_status not in HOMEWORK_VERDICTS:
         message = 'Недокументированный статус домашней работы.'
-        raise HomeworkStatusError(message)
+        raise ValueError(message)
     verdict = HOMEWORK_VERDICTS[homework_status]
     logging.info('Обновлен статус проверки работы.')
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -134,7 +130,7 @@ def main():
             else:
                 logging.debug(
                     'Отсутствие изменения статуса: нет новых домашних работ')
-        except TelegramMessageSendError:
+        except RuntimeError:
             logging.error('Ошибка отправки сообщения в Telegram')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
@@ -145,4 +141,13 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s %(levelname)s %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('main.log')
+        ]
+    )
+
     main()
