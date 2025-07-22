@@ -6,7 +6,6 @@ from http import HTTPStatus
 import requests
 from telebot import TeleBot
 from dotenv import load_dotenv
-from telegram.error import TelegramError
 import json
 
 
@@ -42,9 +41,12 @@ def send_message(bot, message: str) -> None:
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug(f'Успешно отправлено сообщение: {message}')
-    except TelegramError as error:
-        logging.error(f'Ошибка Телеграм при отправке сообщения: {error}')
-        raise RuntimeError(f'Не удалось отправить сообщение: {error}')
+    except ConnectionError as error:
+        raise RuntimeError(f'Ошибка подключения: {error}')
+    except TimeoutError as error:
+        raise RuntimeError(f'Таймаут при отправке: {error}')
+    except (ValueError, TypeError) as error:
+        raise RuntimeError(f'Ошибка данных: {error}')
     except Exception as error:
         logging.error(f'Неожиданная ошибка при отправке сообщения: {error}')
         raise RuntimeError(f'Не удалось отправить сообщение: {error}')
