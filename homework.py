@@ -4,7 +4,7 @@ import sys
 import time
 from http import HTTPStatus
 import requests
-from telebot import TeleBot, apihelper
+from telebot import TeleBot
 from dotenv import load_dotenv
 import json
 
