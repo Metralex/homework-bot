@@ -4,7 +4,7 @@ import sys
 import time
 from http import HTTPStatus
 import requests
-from telebot import TeleBot
+from telebot import TeleBot, apihelper
 from dotenv import load_dotenv
 import json
 
@@ -47,8 +47,8 @@ def send_message(bot, message: str) -> None:
         raise RuntimeError(f'Таймаут при отправке: {error}')
     except (ValueError, TypeError) as error:
         raise RuntimeError(f'Ошибка данных: {error}')
-    except Exception as error:
-        logging.error(f'Неожиданная ошибка при отправке сообщения: {error}')
+    except (AttributeError, RuntimeError) as error:
+        logging.error(f'Ошибка Telegram API: {error}')
         raise RuntimeError(f'Не удалось отправить сообщение: {error}')
 
 
@@ -58,7 +58,7 @@ def get_api_answer(timestamp):
         response = requests.get(
             ENDPOINT, headers=HEADERS, params={'from_date': timestamp}
         )
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         raise Exception(f"Сбой при запросе к эндпоинту API: {error}")
     if response.status_code != HTTPStatus.OK:
         raise requests.HTTPError(f"API вернул код {response.status_code}")
